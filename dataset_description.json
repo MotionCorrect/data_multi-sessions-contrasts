@@ -1,0 +1,7 @@
+{
+  "BIDSVersion": "1.0.1", 
+  "Name": "MS2015_example",
+  "Researcher": "IvadoMed_Testing",
+  "Study": "MS2015 Challenge IO test set. ",
+  "Version": "https://smart-stats-tools.org/lesion-challenge-2015"
+}
