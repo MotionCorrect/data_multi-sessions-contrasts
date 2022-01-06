@@ -1,5 +1,5 @@
 # data_multisession_testing
-Light-weighted data for our integrated multi-sesssional testings
+Light-weighted data for our integrated multi-session testings
 
 # Content
 * sub-ms01: BIDS folder with multiple contrast (T1w/MPRAGE, T2w, FLAIR). Original image and derivatives (see below) are the first 3 subjects from post processed data from lesion challenge 2015. 
