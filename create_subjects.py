@@ -1,4 +1,5 @@
 import json
+import itertools
 from pathlib import Path
 import multiprocessing
 from typing import List
@@ -13,8 +14,6 @@ from nifti_mocker import (
     save_nifty_data,
 )
 
-list_bids_keywords = ["acq", "desc", "run"]
-
 
 class CreateBIDSSubjects(CreateSubject):
     def __init__(
@@ -23,7 +22,7 @@ class CreateBIDSSubjects(CreateSubject):
         index_subject,
         path_to_mock_data,
         list_sessions,
-        list_anatomy_modalities,
+        list_bids_details,
     ):
         """
         Constructor that focus on create all sessions/modalities for a given subject.
@@ -31,14 +30,17 @@ class CreateBIDSSubjects(CreateSubject):
         :param index_subject:
         :param path_to_mock_data:
         :param list_sessions:
-        :param list_anatomy_modalities:
+        :param list_bids_details:
         """
         super(CreateSubject, self).__init__()
         self.id = process_id
         self.index_subject = index_subject
         self.path_to_mock_data = Path(path_to_mock_data)
         self.list_sessions = list_sessions
-        self.list_modalities = list_anatomy_modalities
+
+        # Validate the list before proceeding
+        self.reject_missing_modalities(list_bids_details)
+        self.list_bids_details: List[dict] = list_bids_details
 
     @staticmethod
     def default_constructor(path_to_mock_data):
@@ -59,7 +61,7 @@ class CreateBIDSSubjects(CreateSubject):
         Main entry point of the multiprocess.
         :return:
         """
-        self.create_sessions(self.list_sessions, self.list_modalities)
+        self.create_sessions(self.list_sessions, self.list_bids_details)
 
         # Save mock_json dictionary into a json file:
         mock_json: dict = self.generate_dataset_description_dict()
@@ -68,42 +70,70 @@ class CreateBIDSSubjects(CreateSubject):
         with open(str(path_json_file), "w") as f:
             json.dump(mock_json, f, indent=4, sort_keys=True)
 
-    def create_sessions(self, sessions: List[str], anatomy_modalities: List[str]):
-        for session in sessions:
-            self.create_session_specific_contrasts(session, anatomy_modalities)
+    def create_sessions(
+        self, sessions: List[str] or None, list_bids_details: List[dict]
+    ):
+        # No session lists, single session
+        if sessions is None:
+            self.create_session_specific_contrasts(None, list_bids_details)
+
+        # Session lists
+        else:
+            for session in sessions:
+                self.create_session_specific_contrasts(session, list_bids_details)
 
     def create_session_specific_contrasts(
-        self, session: str, list_contrasts: List[str]
+        self, session: str or None, list_bids_details_in_lists: List[dict]
     ):
         """
         Create the expected nifti files for a given session.
         :param session:
-        :param list_contrasts:
+        :param list_bids_details_in_lists:
         :return:
         """
-        for contrast in list_contrasts:
-            self.create_one_json_nii_pair(session, contrast)
+        # Take a single bids_deetail dict from the list.
+        # This dictionary contain LISTS
+        for a_bids_detail_dict in list_bids_details_in_lists:
 
-    def create_one_json_nii_pair(self, session: str, contrast: str, kwargs=None):
+            # Break down a single bids_detail_dictionary into concretized individual specific bids parameter pairs.
+            # This is because bids_details could have list PER modalities.
+            # e.g. acq = ["T1w", "T2w", "FLAIR", "PD"] needs to be broken down into FOR separate calls.
+            # Source Inspiration: https://stackoverflow.com/a/61335465
+
+            bids_standard_keys, bids_values = zip(*a_bids_detail_dict.items())
+
+            list_permuted_dicts: List[dict] = [
+                dict(zip(bids_standard_keys, a_set_of_permuted_values))
+                for a_set_of_permuted_values in itertools.product(*bids_values)
+            ]
+
+
+            for a_permuted_bids_detail_dict in list_permuted_dicts:
+                self.create_one_json_nii_pair(
+                    session, a_permuted_bids_detail_dict
+                )
+
+    def create_one_json_nii_pair(self, session: str or None, permuted_bids_detail: dict):
         """
         Create a nifti/JSON image pairs with an explicitly set list of session and model
         :param session:
-        :param contrast:
+        :param permuted_bids_detail:
         :param kwargs:
         :return:
         """
-        file_stem: str = self.create_file_stem(session, contrast, kwargs)
+        file_stem: str = self.create_file_stem(session, permuted_bids_detail)
 
         self.generate_a_json_file(
-            file_stem, session=session, contrast=contrast, modality_category="anat"
+            file_stem,
+            session=session,
+            bids_detail=permuted_bids_detail,
+            modality_category="anat",
         )
 
-        self.generate_a_nifti_file(
-            file_stem, session=session, modality_category="anat"
-        )
+        self.generate_a_nifti_file(file_stem, session=session, modality_category="anat")
 
     def generate_a_nifti_file(
-        self, file_stem: str, modality_category: str, session: str
+        self, file_stem: str, modality_category: str, session: str or None
     ):
         """
         Produce the expected nifti files for a given modality_category and session.
@@ -114,100 +144,65 @@ class CreateBIDSSubjects(CreateSubject):
         """
         # Generate Nifti file
         file_name_nii: str = file_stem + ".nii"
-        # create nii file
-        path_nii_file: Path = Path(
-            self.path_to_mock_data,
-            f"sub-{self.index_subject:02d}",
-            f"ses-{session:02d}",
-            f"{modality_category}",
-            file_name_nii,
-        )
+        if session:
+            # create nii file
+            path_nii_file: Path = Path(
+                self.path_to_mock_data,
+                f"sub-{self.index_subject:02d}",
+                f"ses-{session:02d}",
+                f"{modality_category}",
+                file_name_nii,
+            )
+        else:
+            # create nii file
+            path_nii_file: Path = Path(
+                self.path_to_mock_data,
+                f"sub-{self.index_subject:02d}",
+                f"{modality_category}",
+                file_name_nii,
+            )
         mock_data: Nifti1Image = create_mock_nifti1_object()
         path_nii_file.parent.mkdir(parents=True, exist_ok=True)
         save_nifty_data(mock_data, path_nii_file)
 
-    def create_file_stem(self, session: str, modality: str, *kwargs):
-        """
-        Create a file stem for a nifti/JSON image pairs.
-        :param session:
-        :param modality:
-        :param kwargs:
-        :return:
-        """
-        stem = f"sub-{self.index_subject:02d}_ses-{session:02d}_{modality}"
-        for keyword in list_bids_keywords:
-            if keyword in kwargs:
-                stem += f"_{keyword}-{kwargs.get(keyword,'')}"
-        return stem
-
     def generate_a_json_file(
         self,
         file_stem: str,
-        session: str,
-        contrast: str,
+        session: str or None,
+        bids_detail: dict,
         modality_category: str = "anat",
     ):
         """
         Generate a json file for a given modality_category and session.
         :param file_stem:
-        :param contrast:
+        :param bids_detail:
         :param session:
         :return:
         """
         # Generate JSON file
         file_name_json: str = file_stem + ".json"
 
-        # path to JSON file
-        path_json_file: Path = Path(
-            self.path_to_mock_data,
-            f"sub-{self.index_subject:02d}",
-            f"ses-{session:02d}",
-            f"{modality_category}",
-            file_name_json,
-        )
+        if session:
+            # path to JSON file
+            path_json_file: Path = Path(
+                self.path_to_mock_data,
+                f"sub-{self.index_subject:02d}",
+                f"ses-{session:02d}",
+                f"{modality_category}",
+                file_name_json,
+            )
+        else:
+            # path to JSON file
+            path_json_file: Path = Path(
+                self.path_to_mock_data,
+                f"sub-{self.index_subject:02d}",
+                f"{modality_category}",
+                file_name_json,
+            )
         # ensure the parent folder exists
         path_json_file.parent.mkdir(parents=True, exist_ok=True)
-        mock_json: object = self.generate_file_description_dict(contrast)
+        mock_json: object = self.generate_file_description_dict(bids_detail)
 
         # Save mock_json dictionary into a json file:
         with open(path_json_file, "w") as f:
             json.dump(mock_json, f, indent=4, sort_keys=True)
-
-    def generate_file_description_dict(self, contrast: str) -> dict:
-        """
-        Fill a json dictionary with a description of the nifti image.
-        :param contrast:
-        :return:
-        """
-        mock_meta_data = {
-            "Modality": "MR",
-            "MagneticFieldStrength": 3,
-            "Manufacturer": "MOCK",
-            "InstitutionName": "MOCK Research Center",
-            "MRAcquisitionType": "3D",
-            "SeriesDescription": contrast,
-            "ProtocolName": contrast,
-            "EchoTime": 1,
-            "RepetitionTime": 1,
-            "InversionTime": 1,
-            "FlipAngle": 1,
-            "SliceThickness": 1,
-            "ConversionSoftware": "MOCK",
-        }
-        return mock_meta_data
-
-    def generate_dataset_description_dict(self) -> dict:
-        """
-        Fill a json dictionary with a description of the entire dataset of the collections of the nifti images.
-        :return:
-        """
-        mock_meta_dataset = {
-            "Name": "MOCK multi-contrast multi-session dataset",
-            "BIDSVersion": "1.0.2",
-            "Researcher": "MOCK_RESEARCHER",
-            "Study": "MOCK_STUDY",
-            "PipelineDescription": {
-                "Name": "MOCK  ivadomed multi contrast multi session pipeline"
-            },
-        }
-        return mock_meta_dataset
