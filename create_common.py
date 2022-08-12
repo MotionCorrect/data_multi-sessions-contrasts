@@ -79,7 +79,9 @@ class CreateSubject(multiprocessing.Process):
         # Append all possible bids keywords
         for keyword in bids_details.keys():
             if "MODALITY" in keyword:
-                stem += f"_{bids_details['MODALITY']}"
+                stem += f"_{bids_details.get('MODALITY', '')}"
+            elif "LABELS" in keyword:
+                stem += f"_{bids_details.get('LABELS', '')}"
             else:
                 stem += f"_{keyword}-{bids_details.get(keyword,'')}"
         return stem
@@ -95,6 +97,18 @@ class CreateSubject(multiprocessing.Process):
                 logger.critical(f"MODALITY is not present in the subject dictionary provided: {pprint.pformat(subject_specific_bids_dict)}")
                 raise ValueError(
                     f"Missing MODALITY field in the provided subject_specific_bids_dict."
+                )
+    def reject_missing_labels(self, list_subject_specific_bids_dicts: List[dict]):
+        """
+        Validate the list of anatomy modalities.
+        :param list_subject_specific_bids_dicts:
+        :return:
+        """
+        for subject_specific_bids_dict in list_subject_specific_bids_dicts:
+            if "LABELS" not in subject_specific_bids_dict:
+                logger.critical(f"LABELS is not present in the subject dictionary provided: {pprint.pformat(subject_specific_bids_dict)}")
+                raise ValueError(
+                    f"Missing LABELS field in the provided subject_specific_bids_dict."
                 )
     def generate_file_description_dict(self, bids_detail: dict) -> dict:
         """

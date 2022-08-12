@@ -23,7 +23,6 @@ class CreateBIDSDerivatives(CreateSubject):
         path_to_mock_data,
         list_sessions: list or None,
         list_bids_details,
-        list_labels,
     ):
         """
         Constructor that focus on create all sessions/modalities for a given subject.
@@ -38,8 +37,11 @@ class CreateBIDSDerivatives(CreateSubject):
         self.index_subject = index_subject
         self.path_to_mock_data = Path(path_to_mock_data)
         self.list_sessions = list_sessions
-        self.list_bids_details = list_bids_details
-        self.list_labels = list_labels
+
+        # Validate the list before proceeding
+        self.reject_missing_modalities(list_bids_details)
+        self.reject_missing_labels(list_bids_details)
+        self.list_bids_details: List[dict] = list_bids_details
 
     @staticmethod
     def default_constructor(path_to_mock_data):
@@ -51,14 +53,12 @@ class CreateBIDSDerivatives(CreateSubject):
         index_subject = [1, 3, 4, 6]
         list_sessions = [2, 4, 6]
         list_modalities = ["T2w"]
-        list_labels = ["lesion-manual-rater1", "lesion-manual-rater2"]
         CreateBIDSDerivatives(
             id,
             index_subject,
             path_to_mock_data,
             list_sessions,
             list_modalities,
-            list_labels,
         )
 
     def run(self):
@@ -130,6 +130,7 @@ class CreateBIDSDerivatives(CreateSubject):
         :param kwargs:
         :return:
         """
+
         file_stem: str = self.create_file_stem(session, bids_detail)
 
         self.generate_a_json_file(
@@ -142,6 +143,7 @@ class CreateBIDSDerivatives(CreateSubject):
         self.generate_a_nifti_label(
             file_stem, session=session, modality_category="anat"
         )
+
 
     def generate_a_json_file(
         self,

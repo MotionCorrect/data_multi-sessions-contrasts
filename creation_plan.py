@@ -11,7 +11,7 @@ def test_create_bids_projects_1():
     :return:
     """
     path_mock_data = r"C:\Temp\Test\\"
-    list_subjects = [5]
+    list_subjects = [1, 2, 3]
     list_subject_sessions = [4, 6, 5]
 
     # This must be in the order of appending
@@ -45,16 +45,15 @@ def test_create_bids_projects_1():
         )
         bids_subject.run()
 
-    list_derivatives_subjects = [9, 10]
+    list_derivatives_subjects = [2, 7]
     list_derivatives_subject_sessions = [5, 4]
     list_subject_specific_bids_dict = [
         {
-            "flip": [1, 2],  # Flip angle
-            "mt": ["on", "off"],  # MT
+            "mt": ["off"],  # MT
             "MODALITY": ["MTS"],  # Modality
+            "LABELS": ["lesion-manual-rater1", "lesion-manual-rater2"]
         },
     ]
-    list_derivatives_subject_labels = ["lesion-manual-rater1", "lesion-manual-rater2"]
 
     # Create the derivatives
     for index, subject in enumerate(list_derivatives_subjects):
@@ -64,6 +63,5 @@ def test_create_bids_projects_1():
             path_to_mock_data=path_mock_data,
             list_sessions=list_derivatives_subject_sessions,
             list_bids_details=list_subject_specific_bids_dict,
-            list_labels=list_derivatives_subject_labels,
         )
         bids_derivative.run()
