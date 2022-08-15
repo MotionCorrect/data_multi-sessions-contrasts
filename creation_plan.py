@@ -11,14 +11,21 @@ def test_create_bids_projects_1():
     :return:
     """
     path_mock_data = r"C:\Temp\Test\\"
+
+    #######################
+    # Subject Mock Section
+    #######################
+
     list_subjects = [1, 2, 3]
     list_subject_sessions = [4, 6, 5]
+    # list_subject_sessions = None
 
     # This must be in the order of appending
     # MUST have bids_details keyword
     list_subject_specific_bids_dict = [
         {
             "acq": ["MTon", "MToff", "T1w"],  # Acquisition
+            "blah blah":[1, 2, 3, 45, 6],
             "MODALITY": ["MTS"],  # Modality
         },
         {
@@ -45,8 +52,14 @@ def test_create_bids_projects_1():
         )
         bids_subject.run()
 
+    ##########################
+    # Derivative Mock Section
+    #########################
+
     list_derivatives_subjects = [2, 7]
     list_derivatives_subject_sessions = [5, 4]
+    # list_derivatives_subject_sessions = None
+
     list_subject_specific_bids_dict = [
         {
             "mt": ["off"],  # MT
